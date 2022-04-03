@@ -1,0 +1,39 @@
+pipeline {
+    agent none
+    environment{
+        BUILD_SERVER_IP='ec2-user@3.110.208.248'
+        DEPLOY_SERVER_IP='ec2-user@13.235.76.173'
+        IMAGE='vkpooja/myrepo:phb$BUILD_NUMBER'
+    }
+    stage('BUILD THE DOCKERFILE AND PUSH TO DOKCER HUB') {
+        agent any
+        steps {
+            script{
+                sshagent(['BUILD_SERVER_KEY']) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'password', usernameVariable: 'username')]) {
+                sh "scp -o StrictHostKeyChecking=no -r docker-files ${BUILD_SERVER_IP}:/home/ec2-user"
+                sh "ssh -o StrictHostKeyChecking=no ${BUILD_SERVER_IP} 'bash ~/docker-files/docker-script.sh'"
+                sh "ssh ${BUILD_SERVER_IP} sudo docker build -t ${IMAGE} /home/ec2-user/docker-files"
+                sh "ssh ${BUILD_SERVER_IP} sudo docker login -u $username -p $password"
+                sh "ssh ${BUILD_SERVER_IP} sudo docker push ${IMAGE}"
+                echo "Packaging the code "
+                }}
+                }
+            }
+        }
+        stage('DEPLOY CONTAINER USING DOCKER_COMPOSE') {
+            agent any
+            steps {
+                script{
+                    sshagent(['DEPLOY_SERVER_KEY']) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'password', usernameVariable: 'username')]) {
+                    sh "scp -o StrictHostKeyChecking=no -r docker-files ${DEPLOY_SERVER_IP}:/home/ec2-user"
+                    sh "ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER_IP} 'bash ~/docker-files/docker-script.sh'"
+                    sh "ssh ${DEPLOY_SERVER_IP} sudo docker login -u $username -p $password"
+                    sh "ssh ${DEPLOY_SERVER_IP} bash /home/ec2-user/docker-files/docker-compose-script.sh ${IMAGE}"
+                    }}
+                }
+            }
+        }
+    }
+}
