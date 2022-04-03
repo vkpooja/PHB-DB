@@ -5,6 +5,7 @@ pipeline {
         DEPLOY_SERVER_IP='ec2-user@13.235.76.173'
         IMAGE='vkpooja/myrepo:phb$BUILD_NUMBER'
     }
+    stages{
     stage('BUILD THE DOCKERFILE AND PUSH TO DOKCER HUB') {
         agent any
         steps {
@@ -18,9 +19,9 @@ pipeline {
                 sh "ssh ${BUILD_SERVER_IP} sudo docker push ${IMAGE}"
                 echo "Packaging the code "
                 }}
-                }
             }
         }
+    }
         stage('DEPLOY CONTAINER USING DOCKER_COMPOSE') {
             agent any
             steps {
